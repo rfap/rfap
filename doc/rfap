@@ -1,0 +1,166 @@
+Remote File Access Protocol version 1
+
+1.  INTRODUCTION
+
+This document describes Remote File Access Protocol version 1 (RFAPv1).
+
+2.  OVERVIEW
+
+There's three types of channels: message channel, stream channel, block
+channel. Message channels are duplex. Stream channels and block channels are
+single directional.
+
+It's always the client to initiate to establish a channel. Each channel is
+assigned a channel id, which is unique among all current channels to the
+server. Authentication applies to channel. Within one underlying connection,
+different channels MAY be authenticate as different principals. Clients MAY
+choose one or multiple encapsulations. Clients MAY encapsulate different
+channels into different type of underlying connections, even they are of the
+same session.
+
+3.  LEVELS
+
+Implementations of higher levels, regardless of whether they are clients or
+servers, MUST be compatible to endpoints of lower levels.
+
+3.1.  Level 0
+
+Level 0 of this protocol can be referred as RFAPv1l0 or RFAPl0, or simply RFAP.
+
+3.2.  Level 1
+
+Level 1 of this protocol can be referred as RFAPv1l1 or RFAPl1.
+
+3.3.  Level 2
+
+Level 2 of this protocol can be referred as RFAPv1l2 or RFAPl2.
+
+4.  ENCAPSULATIONS
+
+4.1.  TCP
+
+A TCP connection is capable of carrying one message channel or one stream
+channel or one block channel at the same time. After previous channel is
+closed, a new channel can reuse the existing TCP connection.
+
+When a TCP connection is established, it's IDLE. The client may send a request
+to establish a channel over an idle connection. When a channel is successfully
+established, the connection is OCCUPIED. After the channel gets closed, the
+channel becomes idle again.
+
+4.1.1.  Establishing a channel
+
+4.1.1.1.  Request
+
+The client sends a message to establish a message channel.
+
+Message structure:
+  Version (1 byte int): 1
+  Message Length (2 byte int)
+  Channel type (c string): "message\0" | "stream\0" | "block\0"
+  Service name (c string): host name (fully qualified domain name)
+  [channel-type specific parameters]
+
+Service name MUST not contain the trailing dot.
+
+Service name MUST be shorter than or equal to 253 bytes. The message of
+requesting to establish a channel MUST not be longer than 1024 bytes.
+
+Server MAY provide different service according to the service name.
+
+4.1.1.2.  Response
+
+On success:
+
+Message structure:
+  Version (1 byte unsigned integer): 1
+  Status (1 byte unsigned integer): 1
+  Channel Id (16 bytes)
+  [channel-type specific parameters]
+
+On failure:
+
+Message structure:
+  Version (1 byte unsigned integer): 1
+  Status (1 byte unsigned integer): 0
+  Error code (1 byte unsigned integer)
+  Error message (c string; UTF-8 encoded)
+
+4.1.2.  Message channel
+
+4.1.3.  Stream channel
+
+Parameters in the request of establishing a channel:
+  Allocation Token (16 bytes)
+  Suggested maximum frame size (4 bytes unsigned integer)
+
+Parameters in the response of establishing a channel:
+  Maximum frame size (4 bytes unsigned integer)
+
+
+Each frame is of the following structure:
+  Payload size (4 bytes unsigned integer)
+  Payload
+
+If any error occurred, the server SHOULD close the channel and the TCP connection.
+
+4.1.4.  Block channel
+
+Parameters in the request of establishing a channel:
+  Allocation Token (16 bytes)
+  Offset Mode (1 bytes unsigned integer)
+  Suggested maximum frame size (4 bytes unsigned integer)
+
+2^(Offset Mode) is the number of bits to represent offsets in a file. Clients
+MUST NEVER use a value smaller than 5. Servers MUST support value 5 and value
+6.
+
+Parameters in the response of establishing a channel:
+  Maximum frame size (4 bytes unsigned integer)
+  Window size (unsigned integer)
+
+Maximum frame size must be equal or less to the suggested maximum frame size.
+Suggested maximum frame size and suggested maximum frame size MUST be greater
+or equal to 256.
+
+Window size is of 2^(Offset Mode)/8 bytes. If window size is 0, The client MAY
+send blocks in any order. Otherwise, the distance between the offset of the end
+of continuous transmitted data from the beginning of file and the offset of the
+end of the latest transmitted block MUST NEVER be greater than the window size.
+
+For example, the window size is 0x100000. The latest transmitted block begins
+at the offset 0x1080000 and has 0x80000 bytes. All data from 0x0 to 0x1000000
+MUST has already been transmitted BEFORE the transmission this block.
+
+Frame structure:
+  Offset-in-file of this block (unsigned integer)
+  Payload size (4 bytes unsigned integer)
+  Payload
+
+The size of frame MUST be equal or less than Maximum frame size.
+
+Offset-in-file of this block is of 2^(Offset Mode)/8 bytes.
+
+If any error occurred, the server SHOULD close the channel and the TCP connection.
+
+4.2.  TLS over TCP
+
+
+
+4.3.  UDP
+
+4.3.1.  Message channel
+4.3.2.  Stream channel
+4.3.3.  Block channel
+
+4.4.  DTLS over UDP
+
+5.  COMMAND
+
+All commands are sent as message.
+
+Client Hello
+Server Hello
+Stream to a File
+Upload a File
+
