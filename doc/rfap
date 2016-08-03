@@ -13,7 +13,7 @@ single directional.
 It's always the client to initiate to establish a channel. Each channel is
 assigned a channel id, which is unique among all current channels to the
 server. Authentication applies to channel. Within one underlying connection,
-different channels MAY be authenticate as different principals. Clients MAY
+different channels MAY be authenticated as different principals. Clients MAY
 choose one or multiple encapsulations. Clients MAY encapsulate different
 channels into different type of underlying connections, even they are of the
 same session.
@@ -40,25 +40,25 @@ Level 2 of this protocol can be referred as RFAPv1l2 or RFAPl2.
 4.1.  TCP
 
 A TCP connection is capable of carrying one message channel or one stream
-channel or one block channel at the same time. After previous channel is
-closed, a new channel can reuse the existing TCP connection.
+channel or one block channel at one time. After previous channel is closed, a
+new channel can reuse the existing TCP connection.
 
-When a TCP connection is established, it's IDLE. The client may send a request
-to establish a channel over an idle connection. When a channel is successfully
-established, the connection is OCCUPIED. After the channel gets closed, the
-channel becomes idle again.
+After a TCP connection is established, it's IDLE initially. The client may
+send a request to establish a channel over an idle connection. When a channel
+is successfully established, the connection is OCCUPIED. After the channel
+gets closed, the channel becomes idle again.
 
 4.1.1.  Establishing a channel
 
 4.1.1.1.  Request
 
-The client sends a message to establish a message channel.
+The client sends a message to establish a channel.
 
-Message structure:
+Request structure:
   Version (1 byte int): 1
-  Message Length (2 byte int)
-  Channel type (c string): "message\0" | "stream\0" | "block\0"
+  Request length (2 byte int)
   Service name (c string): host name (fully qualified domain name)
+  Channel type (c string): "message" | "stream" | "block"
   [channel-type specific parameters]
 
 Service name MUST not contain the trailing dot.
@@ -66,7 +66,12 @@ Service name MUST not contain the trailing dot.
 Service name MUST be shorter than or equal to 253 bytes. The message of
 requesting to establish a channel MUST not be longer than 1024 bytes.
 
-Server MAY provide different service according to the service name.
+Server name and channel type, which are c strings, MUST contain ASCII
+characters only, and MUST end with one zero byte.
+
+Request length is the length of the whole request above.
+
+Server MAY provide different services when different service names are used.
 
 4.1.1.2.  Response
 
@@ -88,30 +93,60 @@ Message structure:
 
 4.1.2.  Message channel
 
+There is no channel-type specific parameters for message channels.
+
+A message is of the following structure:
+  Flags (1 byte; most significant bit first)
+    Type (1 bit): 0
+    Reserved (7 bit)
+  Message serial number (2 bytes; unsigned integer)
+  Message length (2 bytes; unsigned integer)
+  Command domain number (1 byte; unsigned integer)
+  Command name (c string)
+  Serialized parameters for command
+
+A response to the message is of the following structure:
+  Flags (1 byte; most significant bit first)
+    Type (1 bit): 1
+    Reserved (7 bit)
+  Message serial number (2 bytes; unsigned integer): the message serial number
+      of the message which is responded.
+  Response length (2 bytes; unsigned integer)
+  Status TODO
+
 4.1.3.  Stream channel
 
 Parameters in the request of establishing a channel:
+  Flags (1 byte; most significant bit first)
+    Direction (1 bit; boolean): whether the channel is sending data from client
+        to server
+    Reserved (7 bit)
   Allocation Token (16 bytes)
-  Suggested maximum frame size (4 bytes unsigned integer)
+  Suggested maximum frame size (4 bytes; unsigned integer)
 
 Parameters in the response of establishing a channel:
-  Maximum frame size (4 bytes unsigned integer)
+  Maximum frame size (4 bytes; unsigned integer)
 
 
 Each frame is of the following structure:
-  Payload size (4 bytes unsigned integer)
+  Payload size (4 bytes; unsigned integer)
   Payload
 
-If any error occurred, the server SHOULD close the channel and the TCP connection.
+If any error occurred, the server SHOULD close the channel and the TCP
+connection.
 
 4.1.4.  Block channel
 
 Parameters in the request of establishing a channel:
+  Flags (1 byte; most significant bit first)
+    Direction (1 bit; boolean): whether the channel is sending data from client
+        to server
+    Reserved (7 bit)
   Allocation Token (16 bytes)
-  Offset Mode (1 bytes unsigned integer)
-  Suggested maximum frame size (4 bytes unsigned integer)
+  Offset mode (1 bytes; unsigned integer)
+  Suggested maximum frame size (4 bytes; unsigned integer)
 
-2^(Offset Mode) is the number of bits to represent offsets in a file. Clients
+2^(Offset mode) is the number of bits to represent offsets in a file. Clients
 MUST NEVER use a value smaller than 5. Servers MUST support value 5 and value
 6.
 
@@ -123,10 +158,11 @@ Maximum frame size must be equal or less to the suggested maximum frame size.
 Suggested maximum frame size and suggested maximum frame size MUST be greater
 or equal to 256.
 
-Window size is of 2^(Offset Mode)/8 bytes. If window size is 0, The client MAY
-send blocks in any order. Otherwise, the distance between the offset of the end
-of continuous transmitted data from the beginning of file and the offset of the
-end of the latest transmitted block MUST NEVER be greater than the window size.
+Window size is of 2^(Offset mode)/8 bytes. If window size is 0, The client MAY
+send blocks in any order. Otherwise, the distance between the offset of the
+end of continuous transmitted data from the beginning of file and the offset
+of the end of the latest transmitted block MUST NEVER be greater than the
+window size.
 
 For example, the window size is 0x100000. The latest transmitted block begins
 at the offset 0x1080000 and has 0x80000 bytes. All data from 0x0 to 0x1000000
@@ -139,13 +175,20 @@ Frame structure:
 
 The size of frame MUST be equal or less than Maximum frame size.
 
-Offset-in-file of this block is of 2^(Offset Mode)/8 bytes.
+Offset-in-file of this block is of 2^(Offset mode)/8 bytes.
 
 If any error occurred, the server SHOULD close the channel and the TCP connection.
 
 4.2.  TLS over TCP
 
+Immediately after a TCP connection is established, the client MAY send the
+following request to start a TLS channel over the TCP connection:
+  Version (1 byte integer): 1
+  Message Length (2 bytes; integer)
+  Service name (c string): host name (fully qualified domain name)
+  Channel type (c string): "!tls"
 
+The server MAY reject to turn the connection into a TLS connection.
 
 4.3.  UDP
 
@@ -157,10 +200,34 @@ If any error occurred, the server SHOULD close the channel and the TCP connectio
 
 5.  COMMAND
 
-All commands are sent as message.
+This chapter defines the commands which are required to be supported.
+
+Commands are grouped by Command Domains. A command domain is identified by a
+name, which MUST be a ASCII string and be strictly shorter than 255 bytes.
+Using a reverse lower case domain name as prefix of command domain name is
+suggested.  Command domain name is case sensitive.
+
+After a message channel is established both the client and the server MAY
+dynamically assign each command domain a command domain number.
+
+The command domain number 0 is reserved for "org.zith.rfap.control", in
+which necessary command for message channel manipulation are defined. Clients
+and servers MUST NOT assign this number to other command domains.
+
+A Command is identified by a name, which is unique in its command domain.
+Command name MUST be consist of ASCII characters and be strictly shorter than
+63 bytes. Command name is case sensitive.
+
+5.1. Command in org.zith.rfap.control
+
+5.1.1. map
+Command name: map
+
+5.2. Command in org.zith.rfap.function
 
 Client Hello
 Server Hello
 Stream to a File
 Upload a File
 
+// vim: spell spelllang=en_gb ai colorcolumn=80
