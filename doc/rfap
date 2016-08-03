@@ -14,9 +14,10 @@ It's always the client to initiate to establish a channel. Each channel is
 assigned a channel id, which is unique among all current channels to the
 server. Authentication applies to channel. Within one underlying connection,
 different channels MAY be authenticated as different principals. Clients MAY
-choose one or multiple encapsulations. Clients MAY encapsulate different
-channels into different type of underlying connections, even they are of the
-same session.
+choose one or multiple type of underlying connections. The method of
+encapsulating channels into different underlying connections is defined in
+chapter 4. Clients MAY encapsulate different channels into different type of
+underlying connections, even they are of the same session.
 
 3.  LEVELS
 
@@ -55,8 +56,8 @@ gets closed, the channel becomes idle again.
 The client sends a message to establish a channel.
 
 Request structure:
-  Version (1 byte int): 1
-  Request length (2 byte int)
+  Version (1 byte; unsigned integer): 1
+  Request length (2 bytes; unsigned integer)
   Service name (c string): host name (fully qualified domain name)
   Channel type (c string): "message" | "stream" | "block"
   [channel-type specific parameters]
@@ -78,18 +79,43 @@ Server MAY provide different services when different service names are used.
 On success:
 
 Message structure:
-  Version (1 byte unsigned integer): 1
-  Status (1 byte unsigned integer): 1
+  Version (1 byte; unsigned integer): 1
+  Response length (2 bytes; unsigned integer)
+  Status (1 byte; unsigned integer): 1
   Channel Id (16 bytes)
-  [channel-type specific parameters]
+  [channel-type-specific parameters]
 
 On failure:
 
 Message structure:
-  Version (1 byte unsigned integer): 1
-  Status (1 byte unsigned integer): 0
+  Version (1 byte; unsigned integer): 1
+  Response length (2 bytes; unsigned integer)
+  Status (1 byte; unsigned integer): 0
   Error code (1 byte unsigned integer)
   Error message (c string; UTF-8 encoded)
+  [error-code-specific payload]
+
+Error code from 128 to 255 are for private use.
+
+Error code from 0 to 127 are defined below:
+  0     unknown error
+  1     temporary redirection
+  2     permanent redirection
+
+4.1.1.2.1.  Redirection
+
+When error code is 1 or 2, the response indicate a redirection. When the
+client has received a temporary redirection, it SHOULD try to connected the
+new target for one time. When there is a permanent redirection, the client
+SHOULD remember this redirection. All following connections to the same IP
+address and using the same service name SHOULD be automatically redirected to
+the new target. The clients SHOULD remember permanent redirections for a
+period which is not shorter than the TTL of the domain name of the server
+which is returned by DNS, unless the TTL is longer than 24 hours. For the
+later case, the clients SHOULD remember the redirection for at lease 24 hours.
+
+The target is stored in payload as a c string. Service indicator representing
+a RFAP service is defined in section 6.1.
 
 4.1.2.  Message channel
 
@@ -188,7 +214,23 @@ following request to start a TLS channel over the TCP connection:
   Service name (c string): host name (fully qualified domain name)
   Channel type (c string): "!tls"
 
-The server MAY reject to turn the connection into a TLS connection.
+If the server accepts TLS connections, it responses:
+  Version (1 byte; unsigned integer): 1
+  Response length (2 bytes; unsigned integer): 4
+  Status (1 byte; unsigned integer): 1
+
+The server can also reject to turn the connection into a TLS connection. Then,
+it responses:
+  Version (1 byte; unsigned integer): 1
+  Response length (2 bytes; unsigned integer): 4
+  Status (1 byte; unsigned integer): 0
+
+After the server accepts a TLS connection, the client starts TLS negotiation.
+The server MUST use a certificate certify it as the host the service name
+specifies. Then, all things are the same as which is defined in section 4.1,
+except they are sent over TLS.
+
+If the server rejects a TLS connection, TODO.
 
 4.3.  UDP
 
@@ -230,4 +272,19 @@ Server Hello
 Stream to a File
 Upload a File
 
-// vim: spell spelllang=en_gb ai colorcolumn=80
+6. Remote file indicator
+
+6.1. Indicate a Service
+A service indicator is a string which indicates a RFAP service.
+
+[user[:passowrd]@]host[:port][/:service_name]
+
+6.2. Indicate a Remote File
+
+service_indicator/file_path
+
+If the file path does not begin with a slash, it's related to the home of
+service. If the file path begin with a slash, it's related to the root of the
+service.
+
+// vim: spell spelllang=en_gb ai colorcolumn=80 et ts=4 sw=4
