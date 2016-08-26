@@ -12,42 +12,47 @@ single directional.
 
 It's always the client to initiate to establish a channel. Each channel is
 assigned a channel id, which is unique among all current channels to the
-server. Authentication applies to channel. Within one underlying connection,
+server. Authentication applies to a channel. Within one underlying connection,
 different channels MAY be authenticated as different principals. Clients MAY
-choose one or multiple type of underlying connections. The method of
+choose one or multiple types of underlying connections. The method of
 encapsulating channels into different underlying connections is defined in
-chapter 4. Clients MAY encapsulate different channels into different type of
+chapter 4. Clients MAY encapsulate different channels into different types of
 underlying connections, even they are of the same session.
 
-3.  LEVELS
+3.  LEVELS OF IMPLEMENTATION
 
 Implementations of higher levels, regardless of whether they are clients or
 servers, MUST be compatible to endpoints of lower levels.
 
 3.1.  Level 0
 
-Level 0 of this protocol can be referred as RFAPv1l0 or RFAPl0, or simply RFAP.
+Implementations of level 0 MUST support TCP encapsulation. They MUST support
+username and password, channel id authentication.
 
 3.2.  Level 1
 
-Level 1 of this protocol can be referred as RFAPv1l1 or RFAPl1.
+Implementations of level 1 MUST support TCP, TLS over TCP, UDP, and DTLS over
+UDP encapsulation. They MUST support username and password, channel id
+authentication.
 
 3.3.  Level 2
 
-Level 2 of this protocol can be referred as RFAPv1l2 or RFAPl2.
+Implementations of level 1 MUST support TCP, TLS over TCP, UDP, and DTLS over
+UDP encapsulation. They MUST support username and password, channel id, and
+GSS-API authentication.
 
 4.  ENCAPSULATIONS
 
 4.1.  TCP
 
 A TCP connection is capable of carrying one message channel or one stream
-channel or one block channel at one time. After previous channel is closed, a
-new channel can reuse the existing TCP connection.
+channel or one block channel at one time. After the previous channel is closed,
+a new channel can reuse the existing TCP connection.
 
-After a TCP connection is established, it's IDLE initially. The client may
-send a request to establish a channel over an idle connection. When a channel
-is successfully established, the connection is OCCUPIED. After the channel
-gets closed, the channel becomes idle again.
+After a TCP connection is established, it's IDLE initially. The client may send
+a request to establish a channel over an idle connection. When a channel is
+successfully established, the connection is OCCUPIED. After the channel gets
+closed, the channel becomes idle again.
 
 4.1.1.  Establishing a channel
 
@@ -62,17 +67,17 @@ Request structure:
   Channel type (c string): "message" | "stream" | "block"
   [channel-type specific parameters]
 
-Service name MUST not contain the trailing dot.
-
-Service name MUST be shorter than or equal to 253 bytes. The message of
-requesting to establish a channel MUST not be longer than 1024 bytes.
+Service name MUST not contain the trailing dot. Service name MUST be shorter
+than or equal to 253 bytes. The message of requesting to establish a channel
+MUST not be longer than 1024 bytes.
 
 Server name and channel type, which are c strings, MUST contain ASCII
-characters only, and MUST end with one zero byte.
+characters only, and MUST end with one byte of zero.
 
 Request length is the length of the whole request above.
 
-Server MAY provide different services when different service names are used.
+The server MAY provide different services when different service names are
+used.
 
 4.1.1.2.  Response
 
@@ -104,41 +109,36 @@ Error code from 0 to 127 are defined below:
 
 4.1.1.2.1.  Redirection
 
-When error code is 1 or 2, the response indicate a redirection. When the
-client has received a temporary redirection, it SHOULD try to connected the
-new target for one time. When there is a permanent redirection, the client
-SHOULD remember this redirection. All following connections to the same IP
-address and using the same service name SHOULD be automatically redirected to
-the new target. The clients SHOULD remember permanent redirections for a
-period which is not shorter than the TTL of the domain name of the server
-which is returned by DNS, unless the TTL is longer than 24 hours. For the
-later case, the clients SHOULD remember the redirection for at lease 24 hours.
+When the error code is 1 or 2, the response indicates a redirection. When the
+client has received a temporary redirection, it SHOULD try to connect the new
+target for one time. When there is a permanent redirection, the client SHOULD
+remember this redirection. All following connections to the same IP address and
+using the same service name SHOULD be automatically redirected to the new
+target. The clients SHOULD remember permanent redirections for a period which
+is not shorter than the TTL of the domain name of the server which is returned
+by DNS unless the TTL is longer than 24 hours. For the later case, the clients
+SHOULD remember the redirection for at lease 24 hours.
 
-The target is stored in payload as a c string. Service indicator representing
-a RFAP service is defined in section 6.1.
+The target is stored in the payload as a c string. Service indicator
+representing an RFAP service is defined in section 6.1.
+
+When a client received a target with no encapsulation mode it accepts, it
+SHOULD prompt an error.
 
 4.1.2.  Message channel
 
-There is no channel-type specific parameters for message channels.
+There are no channel-type specific parameters for message channels.
 
 A message is of the following structure:
   Flags (1 byte; most significant bit first)
     Type (1 bit): 0
     Reserved (7 bit)
   Message serial number (2 bytes; unsigned integer)
+  Responded message serial number (2 bytes; unsigned integer)
   Message length (2 bytes; unsigned integer)
   Command domain number (1 byte; unsigned integer)
   Command name (c string)
   Serialized parameters for command
-
-A response to the message is of the following structure:
-  Flags (1 byte; most significant bit first)
-    Type (1 bit): 1
-    Reserved (7 bit)
-  Message serial number (2 bytes; unsigned integer): the message serial number
-      of the message which is responded.
-  Response length (2 bytes; unsigned integer)
-  Status TODO
 
 4.1.3.  Stream channel
 
@@ -184,11 +184,11 @@ Maximum frame size must be equal or less to the suggested maximum frame size.
 Suggested maximum frame size and suggested maximum frame size MUST be greater
 or equal to 256.
 
-Window size is of 2^(Offset mode)/8 bytes. If window size is 0, The client MAY
-send blocks in any order. Otherwise, the distance between the offset of the
-end of continuous transmitted data from the beginning of file and the offset
-of the end of the latest transmitted block MUST NEVER be greater than the
-window size.
+The window size is of 2^(Offset mode)/8 bytes. If the window size is 0, The
+client MAY send blocks in any order. Otherwise, the distance between the offset
+of the end of continuously transmitted data from the beginning of the file and
+the offset of the end of the latest transmitted block MUST NEVER be greater
+than the window size.
 
 For example, the window size is 0x100000. The latest transmitted block begins
 at the offset 0x1080000 and has 0x80000 bytes. All data from 0x0 to 0x1000000
@@ -199,11 +199,12 @@ Frame structure:
   Payload size (4 bytes unsigned integer)
   Payload
 
-The size of frame MUST be equal or less than Maximum frame size.
+The size of a frame MUST be equal or less than Maximum frame size.
 
 Offset-in-file of this block is of 2^(Offset mode)/8 bytes.
 
-If any error occurred, the server SHOULD close the channel and the TCP connection.
+If any error occurred, the server SHOULD close the channel and the TCP
+connection.
 
 4.2.  TLS over TCP
 
@@ -245,16 +246,16 @@ If the server rejects a TLS connection, TODO.
 This chapter defines the commands which are required to be supported.
 
 Commands are grouped by Command Domains. A command domain is identified by a
-name, which MUST be a ASCII string and be strictly shorter than 255 bytes.
+name, which MUST be an ASCII string and be strictly shorter than 255 bytes.
 Using a reverse lower case domain name as prefix of command domain name is
 suggested.  Command domain name is case sensitive.
 
 After a message channel is established both the client and the server MAY
 dynamically assign each command domain a command domain number.
 
-The command domain number 0 is reserved for "org.zith.rfap.control", in
-which necessary command for message channel manipulation are defined. Clients
-and servers MUST NOT assign this number to other command domains.
+The command domain number 0 is reserved for "org.zith.rfap.control", in which
+necessary commands for message channel manipulation are defined. Clients and
+servers MUST NOT assign this number to other command domains.
 
 A Command is identified by a name, which is unique in its command domain.
 Command name MUST be consist of ASCII characters and be strictly shorter than
@@ -272,19 +273,30 @@ Server Hello
 Stream to a File
 Upload a File
 
-6. Remote file indicator
+6. Remote file identifier
 
 6.1. Indicate a Service
-A service indicator is a string which indicates a RFAP service.
+A service indicator is a string which indicates an RFAP service.
 
-[user[:passowrd]@]host[:port][/:service_name]
+service_indicator = mode ? ":" host ( ":" port ) ? ( "/:" service_name ) ?
+
+mode = "rfap" supported_encapsulation ?
+
+supported_encapsulation = ( "+" encapsulation ) +
+
+encapsulation = "udp" | "tcp" | "tls" | "dtls"
+
+When supported_encapsulation is absent, it's equal to "+udp+tcp+tls+dtls".
+
+When multiple supported encapsulations are given, clients SHOULD try them in
+this order: "dtls", "udp", "tls", "tcp".
 
 6.2. Indicate a Remote File
 
 service_indicator/file_path
 
 If the file path does not begin with a slash, it's related to the home of
-service. If the file path begin with a slash, it's related to the root of the
+service. If the file path begins with a slash, it's related to the root of the
 service.
 
 // vim: spell spelllang=en_gb ai colorcolumn=80 et ts=4 sw=4
