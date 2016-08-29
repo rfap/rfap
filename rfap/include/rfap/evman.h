@@ -1,4 +1,6 @@
+#include <rfap/config.h>
 #include <rfap/types.h>
+#include <rfap/taskqueue.h>
 
 enum rfap_evhandler_type
 {
@@ -7,6 +9,8 @@ enum rfap_evhandler_type
 
 struct rfap_evhandler
 {
+	struct rfap_task base;
+
 	struct rfap_evman *evman;
 
 	enum rfap_evhandler_type type;
@@ -30,7 +34,8 @@ struct rfap_evhandler_channel
 
 struct rfap_evman
 {
-	void (*wait)(struct rfap_evman *evman, int timeout);
+	struct rfap_taskqueue base;
+
 	int (*remove)(struct rfap_evman *evman,
 			struct rfap_evhandler *evhandler);
 	int (*add_acceptor)(struct rfap_evman *evman,

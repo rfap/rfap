@@ -11,7 +11,7 @@ struct rfap_evman_epoll
 	int epfd;
 };
 
-static void rfap_evman_epoll_wait(struct rfap_evman *_evman, int timeout)
+static void rfap_evman_epoll_wait(struct rfap_taskqueue *_evman)
 {
 	struct rfap_evman_epoll *evman;
 	evman = (struct rfap_evman_epoll *) _evman;
@@ -22,7 +22,7 @@ static void rfap_evman_epoll_wait(struct rfap_evman *_evman, int timeout)
 	while (evnum == 64) {
 		int i;
 
-		evnum = epoll_wait(evman->epfd, events, 64, timeout);
+		evnum = epoll_wait(evman->epfd, events, 64, 0);
 
 		if (evnum == -1) {
 			abort();  // TODO
@@ -89,9 +89,13 @@ err:
 void rfap_evman_epoll_init(struct rfap_evman *_evman)
 {
 	struct rfap_evman_epoll *evman;
+
+	rfap_taskqueue_init(
+			(struct rfap_taskqueue *) evman,
+			rfap_evman_epoll_wait);
+
 	evman = (struct rfap_evman_epoll *) _evman;
 
-	evman->base.wait = rfap_evman_epoll_wait;
 	evman->base.remove = rfap_evman_epoll_remove;
 	evman->base.add_acceptor = rfap_evman_epoll_add_acceptor;
 	evman->epfd = epoll_create1(0);
