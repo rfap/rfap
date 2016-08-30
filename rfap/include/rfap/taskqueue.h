@@ -16,8 +16,7 @@ struct rfap_taskqueue {
 
 	/* interface */
 	struct rfap_task *(*wait)(struct rfap_taskqueue *tq);
-	int (*add)(struct rfap_task *tasks, int n);
-	int (*close)(struct rfap_task *task);
+	int (*close)(struct rfap_taskqueue *tq);
 
 	/* private */
 	struct rfap_task *head;
@@ -34,5 +33,8 @@ struct rfap_taskqueue {
 int rfap_taskqueue_init(
 		struct rfap_taskqueue *tq,
 		void (*wait_unsafely)(struct rfap_taskqueue *tq));
+
+/* This method should only be called from tq->wait_unsafely */
+void rfap_taskqueue_add(struct rfap_taskqueue *tq, struct rfap_task *task);
 
 void rfap_taskqueue_work(struct rfap_taskqueue *tq);

@@ -60,7 +60,7 @@ int rfap_taskqueue_init(
 {
 	tq->wait_unsafely = wait_unsafely;
 
-	tq->wait = 0;
+	tq->waiting = 0;
 
 #ifdef CONFIG_TASKQUEUE_PTHREAD
 
@@ -82,6 +82,12 @@ int rfap_taskqueue_init(
 
 err:
 	return -1;
+}
+
+void rfap_taskqueue_add(struct rfap_taskqueue *tq, struct rfap_task *task)
+{
+	task->next = tq->head;
+	tq->head = task;
 }
 
 void rfap_taskqueue_work(struct rfap_taskqueue *tq)

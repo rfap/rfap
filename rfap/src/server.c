@@ -154,5 +154,3 @@ void rfapd_server_init(struct rfapd_server *server, struct rfap_evman *evman)
 	server->accept = rfapd_server_accept;
 	server->cleaner = NULL;
 }
-
-// vim: ts=4 sw=4

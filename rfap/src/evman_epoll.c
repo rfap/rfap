@@ -11,6 +11,13 @@ struct rfap_evman_epoll
 	int epfd;
 };
 
+static void rfap_evhandler_acceptor_epoll_run(struct rfap_task *_acceptor)
+{
+	struct rfap_evhandler_acceptor *acceptor =
+		(struct rfap_evhandler_acceptor *) _acceptor;
+	acceptor->ready_to_accept(acceptor);
+}
+
 static void rfap_evman_epoll_wait(struct rfap_taskqueue *_evman)
 {
 	struct rfap_evman_epoll *evman;
@@ -32,17 +39,9 @@ static void rfap_evman_epoll_wait(struct rfap_taskqueue *_evman)
 			struct rfap_evhandler *handler;
 			handler = events[i].data.ptr;
 
-			switch (handler->type) {
-				case RFAP_EVHANDLER_ACCEPTABLE: {
-					struct rfap_evhandler_acceptor *acceptor =
-						(struct rfap_evhandler_acceptor *) handler;
-					acceptor->ready_to_accept(acceptor);
-					break;
-				}
-
-			default:
-				abort();
-			}
+			rfap_taskqueue_add(
+					(struct rfap_taskqueue *) evman,
+					(struct rfap_task *) handler);
 		}
 	}
 }
@@ -80,6 +79,8 @@ static int rfap_evman_epoll_add_acceptor(struct rfap_evman *_evman,
 		goto err;
 	}
 
+	acceptor->base.base.run = rfap_evhandler_acceptor_epoll_run;
+
 	return 0;
 
 err:
@@ -100,5 +101,3 @@ void rfap_evman_epoll_init(struct rfap_evman *_evman)
 	evman->base.add_acceptor = rfap_evman_epoll_add_acceptor;
 	evman->epfd = epoll_create1(0);
 }
-
-// vim: ts=4 sw=4

@@ -41,5 +41,3 @@ struct rfap_evman
 	int (*add_acceptor)(struct rfap_evman *evman,
 			struct rfap_evhandler_acceptor *acceptor);
 };
-
-// vim: ts=4 sw=4
