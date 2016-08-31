@@ -1,9 +1,13 @@
 cmake_minimum_required (VERSION 3.0)
-project (RFAP)
+project (RFAP C)
+
+find_package (Threads)
 
 if (${CMAKE_SYSTEM_NAME} MATCHES Linux)
 	option(WITH_EPOLL "use epoll() to manage events" ON)
-	option(WITH_PTHREAD "use PThread API" ON)
+	if (CMAKE_USE_PTHREADS_INIT)
+		option(WITH_PTHREAD "use PThread API" ON)
+	endif ()
 endif ()
 
 set (librfapd_SOURCES )
@@ -25,10 +29,10 @@ configure_file(include/rfap/config.h.in include/rfap/config.h)
 
 list (APPEND librfapd_SOURCES src/server.c src/taskqueue.c)
 add_library (librfapd SHARED ${librfapd_SOURCES})
+target_link_libraries (librfapd LINK_PUBLIC ${CMAKE_THREAD_PREFER_PTHREAD})
 
 set_target_properties (librfapd PROPERTIES OUTPUT_NAME rfapd)
 add_executable (rfapd src/rfapd_main.c)
-
 target_link_libraries (rfapd LINK_PUBLIC librfapd)
 
 include_directories (${CMAKE_BINARY_DIR}/include include)
