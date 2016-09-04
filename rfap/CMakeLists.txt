@@ -5,9 +5,12 @@ find_package (Threads)
 
 if (${CMAKE_SYSTEM_NAME} MATCHES Linux)
 	option(WITH_EPOLL "use epoll() to manage events" ON)
-	if (CMAKE_USE_PTHREADS_INIT)
-		option(WITH_PTHREAD "use PThread API" ON)
-	endif ()
+elseif (${CMAKE_SYSTEM_NAME} MATCHES Darwin)
+	option(WITH_KQUEUE "use kqueue() to manage events" ON)
+endif ()
+
+if (CMAKE_USE_PTHREADS_INIT)
+	option(WITH_PTHREAD "use PThread API" ON)
 endif ()
 
 set (librfapd_SOURCES )
@@ -18,6 +21,7 @@ if (WITH_EPOLL)
 endif ()
 
 if (WITH_KQUEUE)
+	set (CONFIG_EVMAN_KQUEUE_AS_DEFAULT ON)
 	list(APPEND librfapd_SOURCES src/evman_kqueue.c)
 endif ()
 

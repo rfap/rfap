@@ -2,18 +2,11 @@
 #include <rfap/types.h>
 #include <rfap/taskqueue.h>
 
-enum rfap_evhandler_type
-{
-	RFAP_EVHANDLER_ACCEPTABLE
-};
-
 struct rfap_evhandler
 {
 	struct rfap_task base;
 
 	struct rfap_evman *evman;
-
-	enum rfap_evhandler_type type;
 	int fd;
 };
 

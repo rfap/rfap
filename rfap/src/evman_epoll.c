@@ -46,7 +46,7 @@ static void rfap_evman_epoll_wait(struct rfap_taskqueue *_evman)
 	}
 }
 
-int rfap_evman_epoll_remove(struct rfap_evman *_evman,
+static int rfap_evman_epoll_remove(struct rfap_evman *_evman,
 		struct rfap_evhandler *evhandler)
 {
 	struct rfap_evman_epoll *evman;
@@ -62,7 +62,8 @@ err:
 	return -1;
 }
 
-static int rfap_evman_epoll_add_acceptor(struct rfap_evman *_evman,
+static int rfap_evman_epoll_add_acceptor(
+		struct rfap_evman *_evman,
 		struct rfap_evhandler_acceptor *acceptor)
 {
 	struct rfap_evman_epoll *evman;
@@ -87,7 +88,7 @@ err:
 	return -1;
 }
 
-void rfap_evman_epoll_init(struct rfap_evman *_evman)
+int rfap_evman_epoll_init(struct rfap_evman *_evman)
 {
 	struct rfap_evman_epoll *evman;
 
@@ -100,4 +101,16 @@ void rfap_evman_epoll_init(struct rfap_evman *_evman)
 	evman->base.remove = rfap_evman_epoll_remove;
 	evman->base.add_acceptor = rfap_evman_epoll_add_acceptor;
 	evman->epfd = epoll_create1(0);
+
+	if (evman->epfd == -1) {
+		goto clean_taskqueue;
+	}
+
+	return 0;
+
+clean_taskqueue:
+	evman->base.base.close((struct rfap_taskqueue *) evman);
+
+err:
+	return -1;
 }
